@@ -34,18 +34,18 @@ mod relative;
 mod time;
 mod weekday;
 mod epoch {
-    use winnow::{ascii::dec_int, combinator::preceded, PResult, Parser};
+    use winnow::{ascii::dec_int, combinator::preceded, ModalResult, Parser};
 
     use super::s;
-    pub fn parse(input: &mut &str) -> PResult<i32> {
+    pub fn parse(input: &mut &str) -> ModalResult<i32> {
         s(preceded("@", dec_int)).parse_next(input)
     }
 }
 mod timezone {
     use super::time;
-    use winnow::PResult;
+    use winnow::ModalResult;
 
-    pub(crate) fn parse(input: &mut &str) -> PResult<time::Offset> {
+    pub(crate) fn parse(input: &mut &str) -> ModalResult<time::Offset> {
         time::timezone(input)
     }
 }
@@ -53,15 +53,15 @@ mod timezone {
 use chrono::NaiveDate;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Timelike};
 
-use winnow::error::{AddContext, ParserError, StrContext};
+use winnow::combinator::trace;
+use winnow::error::ParserError;
 use winnow::error::{ContextError, ErrMode};
-use winnow::trace::trace;
 use winnow::{
     ascii::multispace0,
     combinator::{alt, delimited, not, peek, preceded, repeat, separated},
     stream::AsChar,
     token::{none_of, take_while},
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 use crate::ParseDateTimeError;
@@ -93,7 +93,7 @@ where
 /// Parse the space in-between tokens
 ///
 /// You probably want to use the [`s`] combinator instead.
-fn space<'a, E>(input: &mut &'a str) -> PResult<(), E>
+fn space<'a, E>(input: &mut &'a str) -> winnow::Result<(), E>
 where
     E: ParserError<&'a str>,
 {
@@ -110,7 +110,7 @@ where
 /// The last comment should be ignored.
 ///
 /// The plus is undocumented, but it seems to be ignored.
-fn ignored_hyphen_or_plus<'a, E>(input: &mut &'a str) -> PResult<(), E>
+fn ignored_hyphen_or_plus<'a, E>(input: &mut &'a str) -> winnow::Result<(), E>
 where
     E: ParserError<&'a str>,
 {
@@ -127,7 +127,7 @@ where
 ///
 /// A comment is given between parentheses, which must be balanced. Any other
 /// tokens can be within the comment.
-fn comment<'a, E>(input: &mut &'a str) -> PResult<(), E>
+fn comment<'a, E>(input: &mut &'a str) -> winnow::Result<(), E>
 where
     E: ParserError<&'a str>,
 {
@@ -140,7 +140,7 @@ where
 }
 
 // Parse an item
-pub fn parse_one(input: &mut &str) -> PResult<Item> {
+pub fn parse_one(input: &mut &str) -> ModalResult<Item> {
     trace(
         "parse_one",
         alt((
@@ -157,7 +157,7 @@ pub fn parse_one(input: &mut &str) -> PResult<Item> {
     .parse_next(input)
 }
 
-pub fn parse(input: &mut &str) -> PResult<Vec<Item>> {
+pub fn parse(input: &mut &str) -> ModalResult<Vec<Item>> {
     let mut items = Vec::new();
     let mut date_seen = false;
     let mut time_seen = false;
@@ -170,12 +170,7 @@ pub fn parse(input: &mut &str) -> PResult<Vec<Item>> {
                 match item {
                     Item::DateTime(ref dt) => {
                         if date_seen || time_seen {
-                            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                                &input,
-                                StrContext::Expected(winnow::error::StrContextValue::Description(
-                                    "date or time cannot appear more than once",
-                                )),
-                            )));
+                            return Err(ErrMode::Backtrack(ContextError::new()));
                         }
 
                         date_seen = true;
@@ -186,12 +181,7 @@ pub fn parse(input: &mut &str) -> PResult<Vec<Item>> {
                     }
                     Item::Date(ref d) => {
                         if date_seen {
-                            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                                &input,
-                                StrContext::Expected(winnow::error::StrContextValue::Description(
-                                    "date cannot appear more than once",
-                                )),
-                            )));
+                            return Err(ErrMode::Backtrack(ContextError::new()));
                         }
 
                         date_seen = true;
@@ -201,34 +191,19 @@ pub fn parse(input: &mut &str) -> PResult<Vec<Item>> {
                     }
                     Item::Time(_) => {
                         if time_seen {
-                            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                                &input,
-                                StrContext::Expected(winnow::error::StrContextValue::Description(
-                                    "time cannot appear more than once",
-                                )),
-                            )));
+                            return Err(ErrMode::Backtrack(ContextError::new()));
                         }
                         time_seen = true;
                     }
                     Item::Year(_) => {
                         if year_seen {
-                            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                                &input,
-                                StrContext::Expected(winnow::error::StrContextValue::Description(
-                                    "year cannot appear more than once",
-                                )),
-                            )));
+                            return Err(ErrMode::Backtrack(ContextError::new()));
                         }
                         year_seen = true;
                     }
                     Item::TimeZone(_) => {
                         if tz_seen {
-                            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                                &input,
-                                StrContext::Expected(winnow::error::StrContextValue::Description(
-                                    "timezone cannot appear more than once",
-                                )),
-                            )));
+                            return Err(ErrMode::Backtrack(ContextError::new()));
                         }
                         tz_seen = true;
                     }
