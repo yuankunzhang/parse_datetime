@@ -18,12 +18,14 @@
 //! >  - pure numbers.
 //!
 //! We put all of those in separate modules:
+//!  - [`combined`]
 //!  - [`date`]
+//!  - [`epoch`]
+//!  - [`relative`]
 //!  - [`time`]
 //!  - [`timezone`]
-//!  - [`combined`]
 //!  - [`weekday`]
-//!  - [`relative`]
+//!  - [`year`]
 
 #![allow(deprecated)]
 
@@ -35,6 +37,7 @@ mod relative;
 mod time;
 mod timezone;
 mod weekday;
+mod year;
 
 // utility modules
 mod builder;
@@ -55,7 +58,7 @@ use crate::ParseDateTimeError;
 
 #[derive(PartialEq, Debug)]
 pub(crate) enum Item {
-    Timestamp(i32),
+    Timestamp(f64),
     Year(u32),
     DateTime(combined::DateTime),
     Date(date::Date),
@@ -111,9 +114,9 @@ pub(crate) fn at_local(
 /// literal2_date = literal_month , [ { whitespace } ] , day , [ [ literal2_date_delim ] , year ] ;
 /// literal2_date_delim = { whitespace } | [ { whitespace } ] , "," , [ { whitespace } ] ;
 ///
-/// year = dec_int ;
-/// month = dec_int ;
-/// day = dec_int ;
+/// year = dec_uint ;
+/// month = dec_uint ;
+/// day = dec_uint ;
 ///
 /// literal_month = "january" | "jan"
 ///               | "february" | "feb"
@@ -127,6 +130,25 @@ pub(crate) fn at_local(
 ///               | "october" | "oct"
 ///               | "november" | "nov"
 ///               | "december" | "dec" ;
+///
+/// weekday = [ ordinal ] day [ "," ] ;
+///
+/// ordinal = number_ordinal | text_ordinal ;
+///
+/// number_ordinal = [ "+" | "-" ] , dec_uint ;
+///
+/// text_ordinal = "last" | "this" | "next" | "first"
+///              | "third" | "fourth" | "fifth" | "sixth"
+///              | "seventh" | "eighth" | "ninth" | "tenth"
+///              | "eleventh" | "twelfth" ;
+///
+/// day = "monday" | "mon" | "mon."
+///     | "tuesday" | "tue" | "tue." | "tues"
+///     | "wednesday" | "wed" | "wed." | "wednes"
+///     | "thursday" | "thu" | "thu." | "thur" | "thurs"
+///     | "friday" | "fri" | "fri."
+///     | "saturday" | "sat" | "sat."
+///     | "sunday" | "sun" | "sun." ;
 /// ```
 pub(crate) fn parse(input: &mut &str) -> ModalResult<DateTimeBuilder> {
     trace("parse", alt((parse_timestamp, parse_items))).parse_next(input)
@@ -219,7 +241,7 @@ fn parse_item(input: &mut &str) -> ModalResult<Item> {
             relative::parse.map(Item::Relative),
             weekday::parse.map(Item::Weekday),
             timezone::parse.map(Item::TimeZone),
-            date::year.map(Item::Year),
+            year::parse.map(Item::Year),
         )),
     )
     .parse_next(input)
