@@ -70,20 +70,16 @@ enum Item {
     Pure(String),
 }
 
-/// Parse a date and time string based on a specific date.
-pub(crate) fn parse_at_date<S: AsRef<str> + Clone>(base: Zoned, input: S) -> Result<Zoned, Error> {
-    let input = input.as_ref().to_ascii_lowercase();
+/// Prase a date and time string and build a `Zoned` object. The parsed result
+/// is resolved against the given base date and time, or the current local date
+/// and time if no base is given.
+pub(crate) fn parse_and_build<S: AsRef<str>>(
+    input: S,
+    base: Option<Zoned>,
+) -> Result<Zoned, Error> {
+    let input = input.as_ref().trim().to_ascii_lowercase();
     match parse(&mut input.as_str()) {
-        Ok(builder) => builder.set_base(base).build(),
-        Err(e) => Err(e.into()),
-    }
-}
-
-/// Parse a date and time string based on the current local time.
-pub(crate) fn parse_at_local<S: AsRef<str> + Clone>(input: S) -> Result<Zoned, Error> {
-    let input = input.as_ref().to_ascii_lowercase();
-    match parse(&mut input.as_str()) {
-        Ok(builder) => builder.build(),
+        Ok(builder) => builder.set_base(base.unwrap_or(Zoned::now())).build(),
         Err(e) => Err(e.into()),
     }
 }
