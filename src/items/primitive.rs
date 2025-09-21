@@ -6,7 +6,7 @@
 use std::str::FromStr;
 
 use winnow::{
-    ascii::{digit1, multispace0, Uint},
+    ascii::{digit1, multispace0, Int, Uint},
     combinator::{alt, delimited, not, opt, peek, preceded, repeat, separated},
     error::{ContextError, ParserError, StrContext, StrContextValue},
     stream::AsChar,
@@ -86,9 +86,9 @@ where
 ///
 /// Inputs like [+-]?0[0-9]* (e.g., `+012`) are therefore rejected. We provide a
 /// custom implementation to support such zero-prefixed integers.
-#[allow(unused)]
-pub(super) fn dec_int<'a, E>(input: &mut &'a str) -> winnow::Result<i32, E>
+pub(super) fn dec_int<'a, O, E>(input: &mut &'a str) -> winnow::Result<O, E>
 where
+    O: Int + FromStr,
     E: ParserError<&'a str>,
 {
     (opt(one_of(['+', '-'])), digit1)
@@ -136,22 +136,21 @@ where
     s(alt(('+', '-'))).parse_next(input)
 }
 
-/// Parse a double-quoted string, returning its unescaped contents. Supports the
-/// escape sequences `\"` and `\\` for quotes and backslashes, respectively.
-pub(super) fn quoted_string<'a, E>(input: &mut &'a str) -> winnow::Result<String, E>
+/// Parse the *contents* of a double-quoted string, supporting the escape
+/// sequences `\"` and `\\` for quotes and backslashes, respectively.
+///
+/// Note: This does **note** parse the surrounding quotes. It only parses the
+/// inner contents.
+pub(super) fn escaped_string<'a, E>(input: &mut &'a str) -> winnow::Result<String, E>
 where
     E: ParserError<&'a str>,
 {
-    delimited(
-        '"',
-        repeat(
-            0..,
-            alt((
-                preceded('\\', one_of(['\\', '"'])).map(|c: char| c.to_string()),
-                take_while(1, |c| c != '"' && c != '\\').map(str::to_string),
-            )),
-        ),
-        '"',
+    repeat(
+        0..,
+        alt((
+            preceded('\\', one_of(['\\', '"'])).map(|c: char| c.to_string()),
+            take_while(1, |c| c != '"' && c != '\\').map(str::to_string),
+        )),
     )
     .map(|parts: Vec<String>| parts.concat())
     .parse_next(input)
@@ -171,28 +170,25 @@ mod tests {
     #[test]
     fn parse_escaped_string() {
         for (input, expected) in [
-            (r#""""#, ""),                                        // empty string
-            (r#""hello""#, "hello"),                              // simple string
-            (r#""hello world""#, "hello world"),                  // string with space
-            (r#""hello \"world\"""#, r#"hello "world""#),         // escaped quotes
-            (r#""hello \\ world""#, r#"hello \ world"#),          // escaped backslash
-            (r#""he\\llo \\ \"world\"""#, r#"he\llo \ "world""#), // complex
+            ("", ""),                                           // empty string
+            ("hello", "hello"),                                 // simple string
+            ("hello world", "hello world"),                     // string with space
+            ("hello world 123", "hello world 123"),             // string with space and digits
+            (r#"hello \"world\""#, r#"hello "world""#),         // escaped quotes
+            (r#"hello \\ world"#, r#"hello \ world"#),          // escaped backslash
+            (r#"he\\llo \\ \"world\""#, r#"he\llo \ "world""#), // complex
         ] {
             let mut s = input;
-            assert_eq!(quoted_string::<()>(&mut s).unwrap(), expected, "{input}");
+            assert_eq!(escaped_string::<()>(&mut s).unwrap(), expected, "{input}");
         }
 
         for input in [
-            r#"""#,                // missing end quote
-            r#""hello"#,           // missing end quote
-            r#""hello \"world"#,   // missing end quote
-            r#""hello \\ world"#,  // missing end quote
-            r#"hello""#,           // missing start quote
-            r#""hello \q world""#, // invalid escape
+            r#""hello \s world""#, // invalid escape
+            r#""hello \n world""#, // invalid escape
         ] {
             let mut s = input;
             assert!(
-                quoted_string::<()>(&mut s).is_err() || !s.is_empty(),
+                escaped_string::<()>(&mut s).is_err() || !s.is_empty(),
                 "{input}"
             );
         }
