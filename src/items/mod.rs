@@ -25,6 +25,7 @@
 //!  - [`relative`]
 //!  - [`time`]
 //!  - [`timezone`]
+//!  - [`tz_rule`]
 //!  - [`weekday`]
 //!  - [`year`]
 
@@ -36,6 +37,7 @@ mod pure;
 mod relative;
 mod time;
 mod timezone;
+mod tz_rule;
 mod weekday;
 mod year;
 
