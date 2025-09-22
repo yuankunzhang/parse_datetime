@@ -6,7 +6,7 @@
 use std::str::FromStr;
 
 use winnow::{
-    ascii::{digit1, multispace0, Int, Uint},
+    ascii::{digit1, multispace0, Uint},
     combinator::{alt, delimited, not, opt, peek, preceded, repeat, separated},
     error::{ContextError, ParserError, StrContext, StrContextValue},
     stream::AsChar,
@@ -86,9 +86,9 @@ where
 ///
 /// Inputs like [+-]?0[0-9]* (e.g., `+012`) are therefore rejected. We provide a
 /// custom implementation to support such zero-prefixed integers.
-pub(super) fn dec_int<'a, O, E>(input: &mut &'a str) -> winnow::Result<O, E>
+#[allow(unused)]
+pub(super) fn dec_int<'a, E>(input: &mut &'a str) -> winnow::Result<i32, E>
 where
-    O: Int + FromStr,
     E: ParserError<&'a str>,
 {
     (opt(one_of(['+', '-'])), digit1)
