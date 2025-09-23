@@ -136,61 +136,9 @@ where
     s(alt(('+', '-'))).parse_next(input)
 }
 
-/// Parse the *contents* of a double-quoted string, supporting the escape
-/// sequences `\"` and `\\` for quotes and backslashes, respectively.
-///
-/// Note: This does **note** parse the surrounding quotes. It only parses the
-/// inner contents.
-pub(super) fn escaped_string<'a, E>(input: &mut &'a str) -> winnow::Result<String, E>
-where
-    E: ParserError<&'a str>,
-{
-    repeat(
-        0..,
-        alt((
-            preceded('\\', one_of(['\\', '"'])).map(|c: char| c.to_string()),
-            take_while(1, |c| c != '"' && c != '\\').map(str::to_string),
-        )),
-    )
-    .map(|parts: Vec<String>| parts.concat())
-    .parse_next(input)
-}
-
 /// Create a context error with a reason.
 pub(super) fn ctx_err(reason: &'static str) -> ContextError {
     let mut err = ContextError::new();
     err.push(StrContext::Expected(StrContextValue::Description(reason)));
     err
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_escaped_string() {
-        for (input, expected) in [
-            ("", ""),                                           // empty string
-            ("hello", "hello"),                                 // simple string
-            ("hello world", "hello world"),                     // string with space
-            ("hello world 123", "hello world 123"),             // string with space and digits
-            (r#"hello \"world\""#, r#"hello "world""#),         // escaped quotes
-            (r#"hello \\ world"#, r#"hello \ world"#),          // escaped backslash
-            (r#"he\\llo \\ \"world\""#, r#"he\llo \ "world""#), // complex
-        ] {
-            let mut s = input;
-            assert_eq!(escaped_string::<()>(&mut s).unwrap(), expected, "{input}");
-        }
-
-        for input in [
-            r#""hello \s world""#, // invalid escape
-            r#""hello \n world""#, // invalid escape
-        ] {
-            let mut s = input;
-            assert!(
-                escaped_string::<()>(&mut s).is_err() || !s.is_empty(),
-                "{input}"
-            );
-        }
-    }
 }

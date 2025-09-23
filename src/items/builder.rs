@@ -13,6 +13,7 @@ use super::{date, epoch, error, relative, time, timezone, weekday, year, Item};
 #[derive(Debug, Default)]
 pub(crate) struct DateTimeBuilder {
     base: Option<Zoned>,
+    base_tz: Option<jiff::tz::TimeZone>,
     timestamp: Option<epoch::Timestamp>,
     date: Option<date::Date>,
     time: Option<time::Time>,
@@ -265,6 +266,7 @@ impl TryFrom<Vec<Item>> for DateTimeBuilder {
                 Item::TimeZone(tz) => builder.set_timezone(tz)?,
                 Item::Relative(rel) => builder.push_relative(rel)?,
                 Item::Pure(pure) => builder.set_pure(pure)?,
+                _ => return Err("invalid date time item"),
             }
         }
 

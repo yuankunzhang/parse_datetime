@@ -69,6 +69,7 @@ enum Item {
     Weekday(weekday::Weekday),
     Relative(relative::Relative),
     TimeZone(timezone::Offset),
+    TzRule(jiff::tz::TimeZone),
     Pure(String),
 }
 
@@ -198,6 +199,8 @@ fn parse(input: &mut &str) -> ModalResult<DateTimeBuilder> {
 /// > (Timestamp) Such a number cannot be combined with any other date item, as
 /// > it specifies a complete timestamp.
 fn parse_timestamp(input: &mut &str) -> ModalResult<DateTimeBuilder> {
+    let _ = tz_rule::parse(input);
+
     trace(
         "parse_timestamp",
         terminated(epoch::parse.map(Item::Timestamp), preceded(space, eof)),
@@ -271,6 +274,13 @@ mod tests {
             .expect("parsing failed during tests")
             .strftime(fmt)
             .to_string()
+    }
+
+    #[test]
+    fn test_tmp() {
+        let input = r#"TZ="UTC1" @1690466034"#;
+        let result = parse(&mut input.as_ref());
+        println!("result: {result:?}");
     }
 
     #[test]
